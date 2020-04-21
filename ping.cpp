@@ -88,7 +88,7 @@ char* reverse_dns_lookup(char* ip_addr)
 
   if(getnameinfo((struct sockaddr *) &temp_addr,len,buf,sizeof(buf),NULL,0,NI_NAMEREQD))
   {
-    printf("Could not resolve reverse lookup of hostname\n");
+    printf("\nCould not resolve reverse lookup of hostname\n");
     return NULL;
   }
 
@@ -97,9 +97,9 @@ char* reverse_dns_lookup(char* ip_addr)
   return ret_buf;
 }
 
-void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char* rev_host, char* ping_ip, char* ping_dom)
+void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char* rev_host, char* ping_ip, char* ping_dom,int ttl_val = 64)
 {
-  int ttl_val = 64, msg_count = 0, i = 0, flag = 1, msg_received_count = 0;
+  int msg_count = 0, i = 0, flag = 1, msg_received_count = 0;
   unsigned int addr_len = 0;
 
   struct ping_pkt pckt;
@@ -114,7 +114,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char* rev_host, c
 
   if(setsockopt(ping_sockfd, IPPROTO_IP, IP_TTL,&ttl_val,sizeof(ttl_val)) != 0)
   {
-    printf("Couldn't set socket options to TTL\n");
+    printf("\nCouldn't set socket options to TTL\n");
     return;
   }
   else printf("\nSocket set to TTL...\n");
@@ -147,7 +147,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char* rev_host, c
 
     if(recvfrom(ping_sockfd, &pckt, sizeof(pckt),0,(struct sockaddr *)&r_addr,&addr_len) <= 0 && msg_count > 1)
     {
-      printf("Packet receive failed!\n");
+      printf("\nPacket receive failed!\n");
     }
     else
     {
@@ -159,7 +159,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char* rev_host, c
       {
         if(!(pckt.hdr.icmp_type == 69 && pckt.hdr.icmp_code == 0))
         {
-          printf("Error... Packet received with ICMP type: %d and code: %d\n",pckt.hdr.icmp_type,pckt.hdr.icmp_code);
+          printf("\nError... Packet received with ICMP type: %d and code: %d\n",pckt.hdr.icmp_type,pckt.hdr.icmp_code);
         }
         else
         {
@@ -183,11 +183,17 @@ int main(int argc, char *argv[])
   char *ip_addr, *reverse_hostname;
   struct sockaddr_in addr_con;
   int addrlen = sizeof(addr_con);
+  int ttl = 64;
 
-  if(argc != 2)
+  if(argc != 2 && argc != 3)
   {
-    printf("\nFormat %s <address>\n",argv[0]);
+    printf("\nFormat %s <address>\nFormat %s <address>\n <timetolive>\n",argv[0],argv[0]);
     return 0;
+  }
+
+  if(argc == 3)
+  {
+    ttl = stoi(argv[2]);
   }
 
   ip_addr = dns_lookup(argv[1],&addr_con);
@@ -196,7 +202,13 @@ int main(int argc, char *argv[])
     printf("\nCould not resolve host\n");
   }
 
+  printf("\nThe IP address is %s\n", ip_addr);
   reverse_hostname = reverse_dns_lookup(ip_addr);
+  if(!reverse_hostname)
+  {
+    return 0;
+  }
+
   printf("\nTrying to connect to '%s' IP: %s\n",argv[1],ip_addr);
   printf("\nReverse Lookup domain: %s\n",reverse_hostname);
 
@@ -214,6 +226,10 @@ int main(int argc, char *argv[])
 
   signal(SIGINT,intHandler);
 
-  send_ping(sockfd,&addr_con,reverse_hostname,ip_addr,argv[1]);
+  send_ping(sockfd,&addr_con,reverse_hostname,ip_addr,argv[1],ttl);
   return 0;
 }
+
+/*
+nslookup -query=AAAA www.google.com
+*/
